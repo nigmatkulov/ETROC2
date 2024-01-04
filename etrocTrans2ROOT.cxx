@@ -15,19 +15,24 @@
 #include "Hit.h"
 
 //________________
+void readInputFile(const Char_t* inFileName, TTree *T = nullptr);
+
+//________________
 int main(int argc, char const *argv[]) {
 
     const Char_t *inFileName="/Users/gnigmat/work/cms/data/etroc/Run_2_loop_1/TDC_Data_translated_0.nem";
     const Char_t *oFileName = "oEtroc2Trans.root";
 
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <inputFileName>" << std::endl;
+        return 1;
+    }
+
     // Data structure
     UInt_t runId{123};
     UInt_t loopId{1};
     UInt_t eventId{0};
-    std::vector<Hit> board0;
-    std::vector<Hit> board1;
-    std::vector<Hit> board2;
-    std::vector<Hit> board3;
+    std::vector<Hit> Hits;
 
     Hit::Class()->IgnoreTObjectStreamer();
 
@@ -37,12 +42,47 @@ int main(int argc, char const *argv[]) {
     T->Branch("mRunId",   &runId);
     T->Branch("mLoopId",  &loopId);
     T->Branch("mEventId", &eventId);
-    
-    T->Branch("mBoard0", &board0);
-    T->Branch("mBoard1", &board1);
-    T->Branch("mBoard2", &board2);
-    T->Branch("mBoard3", &board3);
+    T->Branch("mHits", &Hits);
 
+    // Read input argument list 
+    if (argc > 1) inFileName = argv[1];
+    if (argc > 2) oFileName = argv[2];
+
+    // Check if the filename ends with ".list"
+    if (inFileName.length() >= 5 && inFileName.substr(filename.length() - 5) == ".list") {
+        std::cout << "The filename ends with \".list\"" << std::endl;
+    } 
+    else if (inFileName.length() >= 4 && inFileName.substr(filename.length() - 4) == ".nem") {
+        // Check if the filename ends with ".nem"
+        std::cout << "The filename ends with \".nem\"" << std::endl;
+        readInputFile(inFileName, T);
+    } 
+    else {
+        std::cout << "The filename does not end with \".list\" or \".nem\"" << std::endl;
+    }
+
+    // Open the input file
+    std::ifstream inputFile("inputFiles.list");
+
+    if (!inputFile.is_open()) {
+        std::cerr << "Error opening the input file." << std::endl;
+        return 1;
+    }
+
+    // Regular expression to match the pattern "Run_<number>_loop_<number>"
+    std::regex pattern("Run_(\\d+)_loop_(\\d+)");
+
+    inputFile.close();
+
+
+
+    return 0;
+}
+
+//________________
+void readInputFile(const Char_t* inFileName, TTree *T = nullptr) {
+
+    std::cout << Form("Read input file: %s\n", inFileName);
     std::ifstream inputFile(inFileName); 
 
     if (!inputFile.is_open()) {
@@ -95,24 +135,7 @@ int main(int argc, char const *argv[]) {
             hit.setCal(cal);
 
             // Add hit to a proper board
-            switch (boardNumber)
-            {
-            case 0:
-                board0.push_back(hit);
-                break;
-            case 1:
-                board1.push_back(hit);
-                break;
-            case 2:
-                board2.push_back(hit);
-                break;
-            case 3:
-                board3.push_back(hit);
-                break;
-            default:
-                std::cout << Form("Wrong board number: %d\n", boardNumber);
-                break;
-            }
+            Hits.push_back( hit );
         }
         else if (line.substr(0, 2) == "ET") {
 
@@ -123,10 +146,7 @@ int main(int argc, char const *argv[]) {
             // }
 
             T->Fill();
-            board0.clear();
-            board1.clear();
-            board2.clear();
-            board3.clear();
+            Hits.clear();
             // Increment event counter
             eventId++;
         } 
@@ -135,8 +155,6 @@ int main(int argc, char const *argv[]) {
         }
     } // while (inputFile)
     std::cout << "\t[DONE]" << std::endl;
-
-    inputFile.close();
 
     // Create a ROOT file to store the TTree
     TFile *oFile = new TFile(oFileName, "RECREATE");
